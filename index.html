@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BESS 20-ft DC Cable Current Distribution</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0c131b;
+    --bg2:#0e1722;
+    --panel:#141f2c;
+    --panel2:#182636;
+    --line:#26384c;
+    --line2:#31465e;
+    --ink:#e8eef5;
+    --muted:#92a6bb;
+    --muted2:#6b7f94;
+    --accent:#2dd4bf;
+    --accent2:#22b8cb;
+    --cal:#2dd4bf;    /* calculated */
+    --inp:#8bb4ff;    /* user input */
+    --sheet:#c79bff;  /* datasheet */
+    --assume:#f5b84a; /* assumption */
+    --limit:#ff8f6b;  /* engineering limit */
+    --warn:#ff5b6e;
+    --ok:#36c98a;
+    --g:#22c55e; --y:#eab308; --o:#f97316; --r:#ef4444;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    box-sizing:border-box;
+    padding-top: env(safe-area-inset-top,0px);
+    padding-bottom: env(safe-area-inset-bottom,0px);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-padding-top: env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+  body{
+    margin:0;font-family:var(--sans);background:
+      radial-gradient(1200px 600px at 80% -10%, #15263a 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent)}
+  h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-0.01em}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ---------- Header ---------- */
+  header{
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#101c29,#0d1621);
+    padding:14px clamp(14px,3vw,26px) 0;
+    position:sticky;top:0;z-index:40;backdrop-filter:blur(6px);
+  }
+  .brandrow{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .mark{
+    width:40px;height:40px;border-radius:9px;flex:none;
+    background:conic-gradient(from 140deg,#2dd4bf,#22b8cb,#1a9bd6,#2dd4bf);
+    display:grid;place-items:center;color:#06222a;font-weight:700;font-family:var(--mono);
+    box-shadow:0 0 0 1px #0b2b31, 0 6px 18px -8px #0bb3c9;
+  }
+  .mark span{font-size:17px}
+  .ttl h1{font-size:clamp(16px,2.2vw,21px)}
+  .ttl .sub{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:70ch}
+  .kpistrip{
+    display:flex;gap:0;flex-wrap:wrap;margin:14px -6px 0;border-top:1px dashed var(--line);
+  }
+  .kpi{padding:10px 16px;border-right:1px solid var(--line);min-width:120px;flex:1 1 120px}
+  .kpi .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted2)}
+  .kpi .v{font-family:var(--mono);font-size:clamp(15px,2vw,19px);font-weight:600;margin-top:2px}
+  .kpi .u{font-size:11px;color:var(--muted);font-weight:400}
+  .kpi.alert .v{color:var(--warn)}
+  .kpi.good .v{color:var(--ok)}
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex;gap:2px;overflow-x:auto;padding:10px clamp(14px,3vw,26px) 0;margin-top:2px;
+    scrollbar-width:thin;
+  }
+  nav.tabs button{
+    appearance:none;border:1px solid transparent;border-bottom:none;background:transparent;
+    color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:500;
+    padding:9px 13px;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;display:flex;gap:7px;align-items:center;
+  }
+  nav.tabs button .n{font-family:var(--mono);font-size:11px;color:var(--muted2)}
+  nav.tabs button:hover{color:var(--ink);background:#16222f}
+  nav.tabs button.active{color:var(--ink);background:var(--panel);border-color:var(--line);position:relative}
+  nav.tabs button.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+
+  /* ---------- Layout ---------- */
+  main{padding:clamp(14px,3vw,26px);max-width:1500px;margin:0 auto}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.view{animation:none}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px}
+  .panel + .panel{margin-top:16px}
+  .panel > h2{font-size:14px;display:flex;align-items:center;gap:9px}
+  .panel > h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 8px var(--accent)}
+  .panel .desc{color:var(--muted);font-size:12px;margin:4px 0 0}
+  .grid{display:grid;gap:16px}
+  .cols-2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+  .cols-3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .sechead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+
+  /* ---------- Badges / value-type legend ---------- */
+  .badge{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;
+    padding:2px 6px;border-radius:5px;font-family:var(--mono);border:1px solid}
+  .b-cal{color:var(--cal);border-color:#1b5c56;background:#0f2b2a}
+  .b-inp{color:var(--inp);border-color:#2b457a;background:#121d33}
+  .b-sheet{color:var(--sheet);border-color:#4b3a6e;background:#1e1632}
+  .b-assume{color:var(--assume);border-color:#6b5420;background:#2c2310}
+  .b-limit{color:var(--limit);border-color:#6e3b2c;background:#2e1812}
+
+  /* ---------- Forms ---------- */
+  .field{margin-bottom:12px}
+  .field label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .field label .lab{color:var(--ink);font-weight:500}
+  input[type=number],input[type=text],select{
+    width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--ink);
+    font-family:var(--mono);font-size:13px;padding:8px 10px;border-radius:8px;outline:none;
+  }
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #19c3d622}
+  input.req{border-color:#6b5420}
+  .hint{font-size:10.5px;color:var(--muted2);margin-top:3px}
+  .seg{display:inline-flex;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:3px}
+  .seg button{appearance:none;border:none;background:transparent;color:var(--muted);font-family:var(--sans);
+    font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#06222a;font-weight:600}
+  .btn{appearance:none;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);
+    font-family:var(--sans);font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:8px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+  .btn:hover{border-color:var(--accent);color:var(--ink)}
+  .btn.primary{background:var(--accent);color:#06222a;border-color:var(--accent);font-weight:600}
+  .btn.ghost{background:transparent}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ---------- Tables ---------- */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px}
+  thead th{background:var(--panel2);color:var(--muted);font-weight:600;text-align:right;
+    padding:9px 11px;border-bottom:1px solid var(--line2);white-space:nowrap;font-size:11px;letter-spacing:.02em;position:sticky;top:0}
+  thead th:first-child,tbody td:first-child{text-align:left}
+  tbody td{padding:8px 11px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);white-space:nowrap}
+  tbody tr:hover{background:#162433}
+  tbody tr:last-child td{border-bottom:none}
+  td.edit input{padding:5px 7px;font-size:12px;width:92px;text-align:right}
+  tfoot td{padding:9px 11px;font-family:var(--mono);font-weight:600;border-top:1px solid var(--line2);text-align:right;background:var(--panel2)}
+  tfoot td:first-child{text-align:left;color:var(--muted)}
+  .cbar{display:inline-block;height:9px;border-radius:3px;vertical-align:middle;margin-left:6px}
+  .pill{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--line2)}
+
+  /* ---------- KPI cards ---------- */
+  .kcards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+  .kcard{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-radius:12px;padding:14px 15px;position:relative;overflow:hidden}
+  .kcard .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)}
+  .kcard .v{font-family:var(--mono);font-size:25px;font-weight:600;margin-top:6px;line-height:1}
+  .kcard .u{font-size:12px;color:var(--muted);font-weight:400}
+  .kcard .sub{font-size:11px;color:var(--muted);margin-top:6px}
+  .kcard::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .kcard.warn::after{background:var(--warn)} .kcard.warn .v{color:var(--warn)}
+  .kcard.good::after{background:var(--ok)}
+
+  /* ---------- Warnings ---------- */
+  .warnlist{display:grid;gap:8px}
+  .wrow{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:9px;font-size:12.5px;border:1px solid}
+  .wrow.w{background:#2a1116;border-color:#5e2530;color:#ffd0d6}
+  .wrow.ok{background:#102a20;border-color:#1f4e3a;color:#b7ecd3}
+  .wrow .ic{font-family:var(--mono);font-weight:700;flex:none}
+
+  /* charts */
+  .chartbox{position:relative;height:260px}
+  .chartbox.tall{height:320px}
+  canvas{max-width:100%}
+
+  /* gauge */
+  .gauge{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--muted);margin-top:10px}
+  .legend .sw{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+
+  /* SVG viz */
+  .svgwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:
+    linear-gradient(0deg,#0b131c,#0d1824);padding:8px}
+  .vz-label{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+  .vz-val{font-family:var(--mono);font-size:10px}
+  svg text{dominant-baseline:middle}
+
+  .note{font-size:11.5px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--assume);
+    border-radius:8px;padding:11px 13px;margin-top:12px}
+  .disclaim{font-size:11.5px;color:var(--muted);line-height:1.55}
+  ul.tight{margin:6px 0 0;padding-left:18px} ul.tight li{margin:4px 0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px}
+  .kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);text-align:right}
+  .scn-cols{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .scn{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel2)}
+  .scn h4{font-size:12.5px;display:flex;justify-content:space-between;align-items:center}
+  .diff-pos{color:var(--warn)} .diff-neg{color:var(--ok)}
+  .footer{color:var(--muted2);font-size:11px;text-align:center;padding:26px 10px 10px;border-top:1px solid var(--line);margin-top:24px}
+  .inline-badges{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 14px}
+  details.form-sec{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+  details.form-sec>summary{cursor:pointer;padding:11px 14px;background:var(--panel2);font-weight:600;font-size:12.5px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  details.form-sec>summary::-webkit-details-marker{display:none}
+  details.form-sec>summary .chev{color:var(--muted);transition:transform .2s}
+  details[open].form-sec>summary .chev{transform:rotate(90deg)}
+  .form-body{padding:14px}
+  .tiprow{display:flex;gap:7px;align-items:center;font-size:11px;color:var(--muted);margin-bottom:8px}
+  @media(max-width:620px){.kpi{min-width:50%} thead th,tbody td{padding:7px 8px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brandrow">
+    <div class="mark"><span>DC</span></div>
+    <div class="ttl" style="flex:1 1 auto">
+      <h1>BESS 20-ft Container — DC Cable Current Distribution &amp; Voltage Drop Analysis</h1>
+      <div class="sub">Parametric model of the parallel DC feeder network. Current distribution is solved from branch resistance (conductance current-divider), not assumed equal. Edit any cable length or parameter and every result updates live.</div>
+    </div>
+  </div>
+  <div class="kpistrip" id="kpistrip"></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+
+<main>
+  <!-- 1 DASHBOARD -->
+  <section class="view" data-view="dash">
+    <div class="panel" style="background:var(--panel2)">
+      <div class="sechead" style="margin-bottom:8px">
+        <div>
+          <h2 style="font-size:13px"><span class="dot"></span>Series / parallel arrangement</h2>
+          <p class="desc" id="dashArrange" style="margin-top:4px"></p>
+        </div>
+        <div class="seg" id="designPresetDash">
+          <button data-v="d1">Design 1 · 12×1</button>
+          <button data-v="d2">Design 2 · 6×2</button>
+        </div>
+      </div>
+      <p class="desc" style="font-size:11px;color:var(--muted2)">Switch design here, or fine-tune racks / strings-per-rack / packs on the Input tab. The whole network re-solves instantly.</p>
+    </div>
+
+    <div class="panel">
+      <div class="sechead"><h2><span class="dot"></span>Engineering dashboard</h2>
+        <div class="inline-badges" style="margin:0">
+          <span class="badge b-cal">calculated</span>
+          <span class="badge b-inp">user input</span>
+          <span class="badge b-sheet">datasheet</span>
+          <span class="badge b-assume">assumption</span>
+          <span class="badge b-limit">limit</span>
+        </div>
+      </div>
+      <div class="kcards" id="kcards"></div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="dot"></span>Engineering checks</h2>
+      <p class="desc">Automatic warnings compare calculated results against the engineering limits you set on the Input tab.</p>
+      <div class="warnlist" id="warnlist" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="panel">
+        <h2><span class="dot"></span>Current distribution by HV Box</h2>
+        <div class="chartbox"><canvas id="c_dist"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2><span class="dot"></span>Current imbalance</h2>
+        <div class="gauge"><div id="gauge"></div></div>
+        <p class="desc" id="gaugeNote" style="text-align:center"></p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="dot"></span>Cable route &amp; current loading</h2>
+      <p class="desc">Branch line weight and colour scale with branch current. Hover a branch for full detail.</p>
+      <div class="svgwrap"><div id="routeMini"></div></div>
+      <div class="legend" id="legendMini"></div>
+    </div>
+  </section>
+
+  <!-- 2 INPUT -->
+  <section class="view" data-view="input">
+    <div class="panel">
+      <div class="sechead">
+        <div><h2><span class="dot"></span>Input data</h2>
+          <p class="desc">Everything below is editable. Fields marked <span class="badge b-assume">assumption</span> or carrying a required-input note must be confirmed against the UL3932 2/0 AWG datasheet and the installation conditions before the results are used for design.</p>
+        </div>
+        <div class="btnrow">
+          <button class="btn" id="xlReload">↻ Reload from inputs.xlsx</button>
+          <label class="btn" style="cursor:pointer">⤓ Import Excel<input type="file" id="xlImport" accept=".xlsx,.xls,.csv" style="display:none"></label>
+          <button class="btn" id="xlExport">⤒ Export Excel</button>
+          <button class="btn" id="resetBtn">Reset to preset</button>
+          <button class="btn ghost" id="saveBtn">Save inputs</button>
+        </div>
+      </div>
+      <div id="xlStatus" class="note" style="margin:0 0 14px;border-left-color:var(--accent)">Data source: built-in defaults. Put an <b>inputs.xlsx</b> next to this page (or Import one) to drive it from Excel.</div>
+
+      <!-- Series / parallel arrangement -->
+      <details class="form-sec" open><summary>Series / parallel arrangement <span class="chev">›</span></summary>
+        <div class="form-body">
+          <div class="field">
+            <label><span class="lab">Design preset</span><span class="badge b-inp">input</span></label>
+            <div class="seg" id="designPreset">
+              <button data-v="d1">Design 1 · single-string</button>
+              <button data-v="d2">Design 2 · dual-string</button>
+            </div>
+            <div class="hint">D1 = 12 racks × 1 string × 8 packs. D2 = 6 racks × 2 strings × 4 packs (dual-string HV box). A preset sets the rack count, strings/rack, packs/string, string cabling and feeder schedule — then edit any field below.</div>
+          </div>
+          <div class="grid cols-3" style="gap:12px">
+            <div class="field" style="margin:0">
+              <label><span class="lab">Racks (HV boxes)</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="nBranch" step="1" min="1" max="48">
+              <div class="hint">= number of feeders; one feeder per HV box</div>
+            </div>
+            <div class="field" style="margin:0">
+              <label><span class="lab">Strings per rack (k)</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="stringsPerRack" step="1" min="1" max="8">
+              <div class="hint">1 = single-string HV box, 2 = dual-string</div>
+            </div>
+            <div class="field" style="margin:0">
+              <label><span class="lab">Packs in series / string</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="packsPerString" step="1" min="1">
+              <div class="hint">sets string voltage &amp; cabling hops</div>
+            </div>
+          </div>
+          <div class="grid cols-3" style="gap:12px;margin-top:12px">
+            <div class="field" style="margin:0">
+              <label><span class="lab">Cells in series / pack</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="cellsPerPack" step="1" min="1">
+              <div class="hint">104 for a 104S1P pack</div>
+            </div>
+            <div class="field" style="margin:0">
+              <label><span class="lab">Nominal cell voltage</span><span class="badge b-assume">assumption</span></label>
+              <input type="number" id="vCell" step="0.01">
+              <div class="hint">V/cell — ~3.2 for LFP (informational)</div>
+            </div>
+            <div class="field" style="margin:0">
+              <label><span class="lab">Total strings</span><span class="badge b-cal">calculated</span></label>
+              <input type="text" id="o_nstrings" readonly style="opacity:.8">
+              <div class="hint">racks × strings/rack, all in parallel</div>
+            </div>
+          </div>
+          <div class="note">The feeder from the combine cabinet runs to each rack's HV box and is <b>shared by every string in that rack</b>, so it carries their combined current. The strings inside a rack are in parallel; the racks are in parallel at the DC bus. Changing k here re-solves the whole two-level network.</div>
+        </div>
+      </details>
+
+      <div class="grid cols-2">
+        <!-- Electrical operating point -->
+        <details class="form-sec" open><summary>Operating point <span class="chev">›</span></summary>
+          <div class="form-body">
+            <div class="field">
+              <label><span class="lab">DC bus voltage</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="Vbus" step="1">
+              <div class="hint">V — nominal pack-string / bus voltage</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Total DC current source</span><span class="badge b-inp">input</span></label>
+              <div class="seg" id="curMode">
+                <button data-v="power" class="on">From PCS power</button>
+                <button data-v="direct">Enter current</button>
+              </div>
+            </div>
+            <div class="field" id="fPower">
+              <label><span class="lab">PCS DC power</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="Ppcs" step="1">
+              <div class="hint">kW — total DC power drawn through the combine cabinet. I<sub>total</sub> = P / V<sub>bus</sub></div>
+            </div>
+            <div class="field" id="fDirect" style="display:none">
+              <label><span class="lab">Operating current (total)</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="Idirect" step="1">
+              <div class="hint">A — total current shared across all branches</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Conductor resistance -->
+        <details class="form-sec" open><summary>Conductor resistance model <span class="chev">›</span></summary>
+          <div class="form-body">
+            <div class="tiprow">UL3932 · 2/0 AWG · DC1500V · cable duct</div>
+            <div class="field">
+              <label><span class="lab">Resistance source</span></label>
+              <div class="seg" id="resMode">
+                <button data-v="datasheet" class="on">B · Datasheet Ω/km</button>
+                <button data-v="calc">A · ρ &amp; area</button>
+              </div>
+            </div>
+            <div id="gSheet">
+              <div class="field">
+                <label><span class="lab">DC resistance at reference temp.</span><span class="badge b-assume">required input</span></label>
+                <input type="number" id="Rkm" step="0.0001" class="req">
+                <div class="hint">Ω/km — <b>REQUIRED.</b> Enter the UL3932 2/0 AWG value from the cable datasheet. Placeholder shown is an assumption only.</div>
+              </div>
+              <div class="field">
+                <label><span class="lab">Datasheet reference temperature</span><span class="badge b-assume">required input</span></label>
+                <input type="number" id="Tref" step="1">
+                <div class="hint">°C — temperature at which the Ω/km value is quoted (commonly 20 °C)</div>
+              </div>
+            </div>
+            <div id="gCalc" style="display:none">
+              <div class="field">
+                <label><span class="lab">Conductor resistivity ρ₂₀</span><span class="badge b-assume">assumption</span></label>
+                <input type="number" id="rho" step="0.0001">
+                <div class="hint">Ω·mm²/m at 20 °C — copper ≈ 0.0175 (verify for tinned/stranded UL3932)</div>
+              </div>
+              <div class="field">
+                <label><span class="lab">Conductor cross-section</span><span class="badge b-assume">assumption</span></label>
+                <input type="number" id="area" step="0.01">
+                <div class="hint">mm² — 2/0 AWG ≈ 67.43 mm² (133.1 kcmil)</div>
+              </div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Operating conductor temperature</span><span class="badge b-assume">required input</span></label>
+              <input type="number" id="Tcond" step="1">
+              <div class="hint">°C — resistance is corrected to this temperature. R(T)=R<sub>ref</sub>·[1+α(T−T<sub>ref</sub>)]</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Temperature coefficient α</span><span class="badge b-assume">assumption</span></label>
+              <input type="number" id="alpha" step="0.0001">
+              <div class="hint">1/°C — copper ≈ 0.00393</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Parallel cables per pole</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="nPar" step="1" min="1">
+              <div class="hint">divides conductor resistance (1 = single cable per pole)</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Return-conductor factor (feeder)</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="feederK" step="1" min="1">
+              <div class="hint">×2 counts positive + negative feeder of equal length as the current loop. Set 1 if the schedule length already is the loop.</div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="grid cols-2">
+        <!-- parasitics -->
+        <details class="form-sec"><summary>Connector &amp; string internals (per string) <span class="chev">›</span></summary>
+          <div class="form-body">
+            <div class="tiprow">All values below are for <b>one string</b> (one series stack of packs). The tool applies them to every string and parallels the strings inside each rack.</div>
+            <div class="field">
+              <label><span class="lab">Contact / connector resistance (each)</span><span class="badge b-assume">required input</span></label>
+              <input type="number" id="Rc" step="0.000001">
+              <div class="hint">Ω per connector — enter the measured/datasheet value (0 = ignore)</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Connectors in series per string</span><span class="badge b-inp">input</span></label>
+              <input type="number" id="nC" step="1" min="0">
+            </div>
+            <div class="field">
+              <label><span class="lab">String internal resistance (one string)</span><span class="badge b-assume">required input</span></label>
+              <input type="number" id="Rpack" step="0.0001">
+              <div class="hint">Ω — DC resistance of one series pack-string. In reality this dominates and <b>equalises</b> current sharing. 0 isolates the cable-only effect (worst case for imbalance). For k strings in a rack the parallel value is this ÷ k.</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">String internal cabling segments</span><span class="badge b-inp">input</span></label>
+              <input type="text" id="rackSegs">
+              <div class="hint">mm, comma-separated — one string's series loop HV Box→P1→…→P<i>n</i>→HV Box. For 4 packs: 5 values (e.g. 1600,500,500,500,800); for 8 packs: 9 values. Replace pack-to-pack values with your real schedule — defaults use 500 mm spacing.</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- limits -->
+        <details class="form-sec"><summary>Engineering limits <span class="chev">›</span></summary>
+          <div class="form-body">
+            <div class="field">
+              <label><span class="lab">Cable ampacity (per pole)</span><span class="badge b-limit">limit</span></label>
+              <input type="number" id="amp" step="1">
+              <div class="hint">A — <b>required.</b> Rated current for UL3932 2/0 AWG at the installed method &amp; ambient, after derating. Verify on datasheet.</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Allowable feeder voltage drop</span><span class="badge b-limit">limit</span></label>
+              <input type="number" id="vdLim" step="0.1">
+              <div class="hint">% of DC bus voltage</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Allowable current imbalance</span><span class="badge b-limit">limit</span></label>
+              <input type="number" id="imbLim" step="1">
+              <div class="hint">%  (Max−Min)/Average</div>
+            </div>
+            <div class="field">
+              <label><span class="lab">Max physical routing length</span><span class="badge b-limit">limit</span></label>
+              <input type="number" id="lenLim" step="100">
+              <div class="hint">mm — flags any feeder longer than the routing allows</div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="panel" style="background:var(--panel2)">
+        <div class="sechead">
+          <div><h2 style="font-size:13px"><span class="dot"></span>Combine Cabinet → HV Box feeder lengths</h2>
+          <p class="desc">One feeder per rack. Set the rack count under <b>Series / parallel arrangement</b> above; edit each feeder length here.</p></div>
+        </div>
+        <div class="tablewrap">
+          <table id="lenTable"><thead><tr>
+            <th>HV Box</th><th>Feeder length (mm)</th><th>R feeder (mΩ)</th><th>R rack (mΩ)</th><th>Share</th><th>Feeder I (A)</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 CALCULATION -->
+  <section class="view" data-view="calc">
+    <div class="panel">
+      <h2><span class="dot"></span>Cable calculation — complete DC network solution</h2>
+      <p class="desc">Each branch is a series resistance from the common DC bus node to the common return. Current divides by conductance: I<sub>i</sub> = I<sub>total</sub> · G<sub>i</sub> / ΣG, with G<sub>i</sub> = 1/R<sub>branch,i</sub>. This is the exact network result for equal-EMF parallel sources — never a proportional-to-length approximation.</p>
+      <div class="grid cols-3" style="margin:14px 0">
+        <div class="kv panel" style="background:var(--panel2)">
+          <dt>R / metre (per pole, @T)</dt><dd id="o_rpm"></dd>
+          <dt>Feeder loop R / metre</dt><dd id="o_rpmloop"></dd>
+          <dt>String cabling R (per string)</dt><dd id="o_rrack"></dd>
+          <dt>Connector R / string</dt><dd id="o_rconn"></dd>
+          <dt>Parallel-network R</dt><dd id="o_rpar"></dd>
+          <dt>Total DC current</dt><dd id="o_itot"></dd>
+        </div>
+        <div class="panel" style="background:var(--panel2)">
+          <div class="kv">
+            <dt>R(section)</dt><dd class="mono">ρ·L / A</dd>
+            <dt>Rack R</dt><dd class="mono">R<sub>feeder</sub> + R<sub>string</sub>/k</dd>
+            <dt>Rack I</dt><dd class="mono">I<sub>tot</sub>·G<sub>i</sub>/ΣG</dd>
+            <dt>String I</dt><dd class="mono">I<sub>rack</sub> / k</dd>
+            <dt>Feeder V-drop</dt><dd class="mono">I<sub>rack</sub>·R<sub>feeder</sub></dd>
+            <dt>Cable loss</dt><dd class="mono">I<sub>rack</sub>²R<sub>f</sub> + k·I<sub>str</sub>²R<sub>str</sub></dd>
+          </div>
+        </div>
+        <div class="panel" style="background:var(--panel2)">
+          <div class="kv">
+            <dt>Average current</dt><dd id="o_iavg"></dd>
+            <dt>Max current</dt><dd id="o_imax"></dd>
+            <dt>Min current</dt><dd id="o_imin"></dd>
+            <dt>Imbalance</dt><dd id="o_imb"></dd>
+            <dt>Total cable loss</dt><dd id="o_loss"></dd>
+            <dt>Max feeder V-drop</dt><dd id="o_vdmax"></dd>
+          </div>
+        </div>
+      </div>
+
+      <div class="tablewrap">
+        <table id="calcTable"><thead><tr>
+          <th>HV Box</th><th>Length<br>(mm)</th><th>R feeder<br>(mΩ)</th><th>R branch<br>(mΩ)</th>
+          <th>Feeder I<br>(A)</th><th>Share<br>(%)</th><th>Feeder V-drop<br>(V / %)</th>
+          <th>Cable loss<br>(W)</th><th>Deviation<br>(%)</th>
+        </tr></thead><tbody></tbody><tfoot></tfoot></table>
+      </div>
+      <div class="note">The <b>feeder</b> carries the combined current of every string in its rack (×k), so with a dual-string HV box it sees roughly twice a single string — this is the binding figure for feeder ampacity and voltage drop. The per-string current (shown in parentheses when k&gt;1) is what flows in the string cable and the pack. Node-to-node voltage drop (bus → string) is <b>equal for every string</b> by construction; the feeder-cable portion shown here varies with routing.</div>
+    </div>
+  </section>
+
+  <!-- 4 DISTRIBUTION -->
+  <section class="view" data-view="dist">
+    <div class="grid cols-2">
+      <div class="panel"><h2><span class="dot"></span>Cable length vs branch current</h2>
+        <div class="chartbox"><canvas id="c_lenI"></canvas></div>
+        <p class="desc">Shorter feeder → lower resistance → higher current share. The relationship is inverse-resistance, not linear.</p>
+      </div>
+      <div class="panel"><h2><span class="dot"></span>Cable resistance vs length</h2>
+        <div class="chartbox"><canvas id="c_resLen"></canvas></div>
+        <p class="desc">Branch resistance rises linearly with feeder length (plus the fixed rack / connector / pack terms).</p>
+      </div>
+      <div class="panel"><h2><span class="dot"></span>Feeder voltage drop by branch</h2>
+        <div class="chartbox"><canvas id="c_vd"></canvas></div>
+      </div>
+      <div class="panel"><h2><span class="dot"></span>Cable power loss by branch</h2>
+        <div class="chartbox"><canvas id="c_loss"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Current balancing analysis</h2>
+      <div class="tablewrap" style="margin-top:12px">
+        <table id="balTable"><thead><tr>
+          <th>HV Box</th><th>Length (mm)</th><th>Resistance (mΩ)</th><th>Current (A)</th><th>Share (%)</th>
+          <th>V-drop (V)</th><th>Loss (W)</th><th>Deviation (%)</th>
+        </tr></thead><tbody></tbody><tfoot></tfoot></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 SCENARIO -->
+  <section class="view" data-view="scn">
+    <div class="panel">
+      <div class="sechead"><div><h2><span class="dot"></span>Scenario comparison</h2>
+        <p class="desc">Scenario A is the current design (locked to your input lengths). Edit B and C to test alternative routing. All other parameters are shared from the Input tab.</p></div>
+        <div class="btnrow">
+          <button class="btn" id="scnSyncA">A ← current input</button>
+          <button class="btn ghost" id="scnCopyB">Copy A → B, C</button>
+        </div>
+      </div>
+      <div class="tablewrap">
+        <table id="scnEdit"><thead><tr><th>HV Box</th><th>A · Existing (mm)</th><th>B · Optimised (mm)</th><th>C · User-defined (mm)</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Results &amp; difference from baseline (A)</h2>
+      <div class="scn-cols" id="scnCards" style="margin-top:12px"></div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Current distribution — all scenarios</h2>
+      <div class="chartbox tall"><canvas id="c_scn"></canvas></div>
+    </div>
+  </section>
+
+  <!-- 6 OPTIMIZATION -->
+  <section class="view" data-view="opt">
+    <div class="panel">
+      <h2><span class="dot"></span>Imbalance-reduction study</h2>
+      <p class="desc">Imbalance is driven by the spread in branch resistance. Mathematically it is minimised by bringing every branch resistance toward the highest branch — achieved by padding shorter feeders. This is an <b>analysis scenario only</b>; it does not alter the engineering design, and physical routing/EMI/length limits always govern.</p>
+      <div class="grid cols-3" style="margin:14px 0">
+        <div class="field"><label><span class="lab">Min feeder length</span><span class="badge b-limit">limit</span></label><input type="number" id="opMin" step="100"><div class="hint">mm</div></div>
+        <div class="field"><label><span class="lab">Max feeder length</span><span class="badge b-limit">limit</span></label><input type="number" id="opMax" step="100"><div class="hint">mm — padding is capped here</div></div>
+        <div class="field"><label><span class="lab">Target imbalance</span><span class="badge b-limit">limit</span></label><input type="number" id="opTgt" step="0.5"><div class="hint">% — padding stops once reached</div></div>
+      </div>
+      <div class="btnrow"><button class="btn primary" id="opRun">Run equalisation study</button>
+        <span class="desc" style="align-self:center">Method: raise each branch R toward R<sub>max</sub> by adding feeder length, within [min,max].</span></div>
+      <div id="opResult" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- 7 LAYOUT -->
+  <section class="view" data-view="viz">
+    <div class="panel">
+      <h2><span class="dot"></span>20-ft container — isometric layout</h2>
+      <p class="desc">Combine cabinet plus each rack's HV box (holding its strings in parallel), cable duct and pos/neg feeders. Rack height/colour shows feeder-current loading. Reflects the arrangement set on the dashboard.</p>
+      <div class="svgwrap"><div id="iso"></div></div>
+      <div class="legend" id="legendIso"></div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Cable route diagram</h2>
+      <p class="desc">Combine Cabinet branching to every HV Box, with actual feeder length and a current arrow per branch — arrow weight and colour scale with branch current. Hover for cable length, resistance, current, voltage drop and loss.</p>
+      <div class="svgwrap"><div id="route"></div></div>
+      <div class="legend" id="legendRoute"></div>
+    </div>
+  </section>
+
+  <!-- 8 SENSITIVITY -->
+  <section class="view" data-view="sens">
+    <div class="panel">
+      <h2><span class="dot"></span>Sensitivity analysis</h2>
+      <p class="desc">Sweep one parameter and watch the key metrics move. Uniformly scaling every length (or changing cable size) preserves the resistance <i>ratios</i>, so imbalance holds while loss and voltage drop scale — scaling an individual length is what changes the distribution.</p>
+      <div class="grid cols-3" style="margin:14px 0">
+        <div class="field"><label><span class="lab">Parameter to vary</span></label>
+          <select id="sParam">
+            <option value="len">Cable length (all branches ×)</option>
+            <option value="volt">DC bus voltage</option>
+            <option value="power">PCS DC power</option>
+            <option value="area">Cable cross-section (size)</option>
+          </select>
+        </div>
+        <div class="field"><label><span class="lab">Sweep points (× / factor)</span><span class="badge b-inp">input</span></label>
+          <input type="text" id="sPts"><div class="hint">comma-separated multipliers of the current value</div></div>
+      </div>
+      <div class="tablewrap">
+        <table id="sensTable"><thead><tr>
+          <th>Factor</th><th>Varied value</th><th>I total (A)</th><th>Max I (A)</th><th>Min I (A)</th>
+          <th>Imbalance (%)</th><th>Total loss (W)</th><th>Max V-drop (V)</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div class="chartbox tall" style="margin-top:14px"><canvas id="c_sens"></canvas></div>
+    </div>
+  </section>
+
+  <!-- 9 NOTES -->
+  <section class="view" data-view="notes">
+    <div class="grid cols-2">
+      <div class="panel">
+        <h2><span class="dot"></span>Model &amp; assumptions</h2>
+        <ul class="tight disclaim">
+          <li><b>Topology (configurable).</b> Two-level parallel network: N rack feeders in parallel at the combine-cabinet DC± nodes, and within each rack k strings in parallel sharing that rack's feeder. Each string is a series stack of packs (e.g. 104S1P packs, 4 or 8 in series). Switch between the two designs on the dashboard — Design 1 (12 racks × 1 string, single-string HV box) and Design 2 (6 racks × 2 strings, dual-string HV box) — or set racks, strings/rack and packs/string directly on the Input tab. With k = 1 this reduces exactly to the flat 12-branch current-divider.</li>
+          <li><b>Feeder carries combined string current.</b> Because both strings in a dual-string rack share one feeder, that feeder carries k× a single string's current. Feeder ampacity and voltage drop are checked against the combined (feeder) current; the string cable and pack see the per-string current. The string-to-string current imbalance is driven by the feeder-length spread across racks; strings within a rack split evenly when identical.</li>
+          <li><b>Equal-EMF assumption.</b> All strings are taken at the same open-circuit voltage (balanced SOC). Under this assumption the exact network solution is the conductance current-divider I<sub>i</sub>=I<sub>tot</sub>·G<sub>i</sub>/ΣG. Unequal SOC would add circulating currents not modelled here.</li>
+          <li><b>Steady-state, resistive.</b> DC only; inductance, skin/proximity effect and transient sharing are not modelled.</li>
+          <li><b>Feeder loop.</b> Positive and negative feeders of equal length ⇒ loop resistance = factor × ρL/A (default factor 2).</li>
+          <li><b>Equal branch V-drop.</b> Node-to-node drop is identical across branches by construction; the reported per-branch drop is the feeder-cable portion, which varies.</li>
+          <li><b>Pack internal resistance dominates reality.</b> With a realistic string resistance the cable-driven imbalance shrinks markedly. Default 0 shows the cable-only worst case the brief asks to expose.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="dot"></span>Value-type legend</h2>
+        <div class="warnlist" style="margin-top:10px">
+          <div class="wrow ok"><span class="badge b-cal">calculated</span><span>Derived by the model from your inputs.</span></div>
+          <div class="wrow ok"><span class="badge b-inp">user input</span><span>Entered directly by you.</span></div>
+          <div class="wrow ok"><span class="badge b-sheet">datasheet</span><span>To be taken from the UL3932 2/0 AWG cable datasheet.</span></div>
+          <div class="wrow ok"><span class="badge b-assume">assumption</span><span>Placeholder / generic value — confirm before design use.</span></div>
+          <div class="wrow ok"><span class="badge b-limit">limit</span><span>Engineering acceptance limit you define.</span></div>
+        </div>
+        <div class="note" style="border-left-color:var(--limit)">
+          <b>Required inputs not to be invented:</b> DC resistance of UL3932 2/0 AWG (Ω/km), conductor temperature, connector resistance, pack resistance, ampacity, allowable voltage drop, allowable current imbalance. Each has an editable field above and is flagged accordingly.
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Disclaimer</h2>
+      <p class="disclaim">Results are engineering calculations based on user-entered electrical parameters and cable resistance. Final design shall be verified against the applicable cable datasheet, installation method, temperature derating, protection settings and applicable standards.</p>
+    </div>
+  </section>
+
+  <div class="footer">BESS DC Cable Current-Distribution Tool · parallel-network solver · all values engineering estimates for review</div>
+</main>
+
+<script>
+"use strict";
+/* ============================= STATE ============================= */
+// Feeder schedules (Combine Cabinet -> HV Box, per rack). mm.
+const SCHEDULE12 = [2100,1900,3000,2800,3900,3600,4900,4700,5800,6600,5500,7500]; // Design 1: 12 single-string racks
+const SCHEDULE6  = [2100,3000,3900,4700,5800,6600];                               // Design 2: 6 dual-string racks (PLACEHOLDER - edit to real)
+const SCHEDULE = SCHEDULE12; // active default (back-compat)
+// String internal cabling presets (one string's series loop HVBox->P1->..->Pn->HVBox). mm.
+const SEG4 = '1600,500,500,500,800';                                 // 4 packs in series
+const SEG8 = '1600,500,500,500,500,500,500,500,800';                 // 8 packs in series
+// Design presets
+const PRESETS = {
+  d1: { name:'Design 1 - single-string HV box', stringsPerRack:1, packsPerString:8,
+        rackSegs:SEG8, lengths:[...SCHEDULE12] },
+  d2: { name:'Design 2 - dual-string HV box',   stringsPerRack:2, packsPerString:4,
+        rackSegs:SEG4, lengths:[...SCHEDULE6] }
+};
+const DEF = {
+  design:'d1',
+  Vbus:1500, curMode:'power', Ppcs:1500, Idirect:1000,
+  resMode:'datasheet', Rkm:0.2600, Tref:20, rho:0.0175, area:67.43,
+  Tcond:45, alpha:0.00393, nPar:1, feederK:2,
+  Rc:0, nC:0, Rpack:0, rackSegs:SEG8,
+  stringsPerRack:1, packsPerString:8, cellsPerPack:104, vCell:3.2,
+  amp:190, vdLim:1.0, imbLim:15, lenLim:9000,
+  nBranch:12, lengths:[...SCHEDULE12]
+};
+function applyPreset(id){
+  const p = PRESETS[id]; if(!p) return;
+  S.design=id; S.stringsPerRack=p.stringsPerRack; S.packsPerString=p.packsPerString;
+  S.rackSegs=p.rackSegs; S.lengths=[...p.lengths];
+  scn.B=[...p.lengths]; scn.C=[...p.lengths];
+  save(); fillInputs(); renderAll();
+}
+let S = load();
+let scn = { B:[...S.lengths], C:[...S.lengths] };
+
+function load(){
+  try{const r=localStorage.getItem('bessdc');if(r){const o=JSON.parse(r);return {...structuredClone(DEF),...o,lengths:o.lengths||[...SCHEDULE]};}}catch(e){}
+  return structuredClone(DEF);
+}
+function save(){try{localStorage.setItem('bessdc',JSON.stringify(S));}catch(e){}}
+
+/* ============================= ENGINE ============================= */
+// All resistances in ohms. Lengths mm. Returns full model — not hardcoded to 12.
+function rPerMetre(){ // per-pole conductor resistance Ω/m at operating temp
+  let base;
+  if(S.resMode==='calc'){
+    const rhoT = S.rho*(1+S.alpha*(S.Tcond-20));
+    base = rhoT/S.area;                         // Ω/m
+  }else{
+    const rRef = S.Rkm/1000;                     // Ω/m at Tref
+    base = rRef*(1+S.alpha*(S.Tcond-S.Tref));
+  }
+  return base/Math.max(1,S.nPar);
+}
+// Two-level network: N rack feeders in parallel; within each rack, k strings in parallel.
+// Feeder carries the COMBINED current of its k strings. Reduces to the flat divider when k=1.
+function compute(lengths){
+  const L = lengths || S.lengths;
+  const N = L.length;                               // racks / HV boxes / feeders
+  const k = Math.max(1, Math.round(S.stringsPerRack||1)); // strings per rack
+  const rpm = rPerMetre();
+  const segSum = S.rackSegs.split(',').map(x=>parseFloat(x)||0).reduce((a,b)=>a+b,0); // mm, ONE string loop
+  const RstrCab = rpm*(segSum/1000);                // one string internal cabling loop
+  const Rconn = (S.nC||0)*(S.Rc||0);                // per string
+  const RstrCu = RstrCab + Rconn;                   // one string copper (loss basis)
+  const Rstring = RstrCu + (S.Rpack||0);            // one string total (incl pack internal R)
+  const Itot = S.curMode==='power' ? (S.Ppcs*1000)/S.Vbus : S.Idirect;
+
+  const b = L.map((len,i)=>{
+    const Rf = rpm*S.feederK*(len/1000);            // shared feeder loop (both strings)
+    const Rp = Rstring / k;                         // k identical strings in parallel within the rack
+    const Rbr = Rf + Rp;                            // rack resistance, bus node -> rack
+    return {i, name:'HV Box '+(i+1), L:len, Rf, RstrCab, Rconn, RstrCu, Rstring, Rp, Rbr, G:1/Rbr, k};
+  });
+  const sumG = b.reduce((a,x)=>a+x.G,0);
+  const Rpar = 1/sumG;
+  b.forEach(x=>{
+    x.I = Itot*x.G/sumG;                            // rack / feeder current (strings combined)
+    x.Ifeeder = x.I;
+    x.Istring = x.I / k;                            // per-string current
+    x.share = x.I/Itot*100;                         // rack share of total
+    x.shareStr = x.Istring/Itot*100;                // string share of total
+    x.vdFeeder = x.I*x.Rf;                          // feeder drop (combined current) - varies
+    x.vdString = x.Istring*x.Rstring;               // string drop
+    x.vdPct = x.vdFeeder/S.Vbus*100;
+    x.vdBranch = x.vdFeeder + x.vdString;           // bus->string total (~const across racks)
+    x.loss = x.I*x.I*x.Rf + k*(x.Istring*x.Istring*x.RstrCu); // feeder + k string copper losses
+    x.lossBranch = x.I*x.I*x.Rbr;
+  });
+  const Is = b.map(x=>x.I);
+  const nStrings = N*k;
+  const Iavg = Itot/N;                              // avg rack / feeder current
+  const IavgStr = Itot/nStrings;                    // avg string current
+  const Imax = Math.max(...Is), Imin = Math.min(...Is);   // rack/feeder level
+  const ImaxStr = Imax/k, IminStr = Imin/k;
+  const imb = (Imax-Imin)/Iavg*100;                 // identical at string level (strings split evenly)
+  b.forEach(x=>x.dev=(x.I-Iavg)/Iavg*100);
+  const totalLoss = b.reduce((a,x)=>a+x.loss,0);
+  const totalLossBr = b.reduce((a,x)=>a+x.lossBranch,0);
+  const vdMax = Math.max(...b.map(x=>x.vdFeeder));
+  const avgLoss = totalLoss/N;
+  const worst = b.reduce((a,x)=>x.I>a.I?x:a,b[0]);          // highest feeder current = thermal worst
+  const worstVd = b.reduce((a,x)=>x.vdFeeder>a.vdFeeder?x:a,b[0]);
+  // nominal string voltage (informational): cells in series x V/cell
+  const cellsSeries = (S.cellsPerPack||0)*(S.packsPerString||0);
+  const vString = cellsSeries*(S.vCell||0);
+  return {b,N,k,nStrings,rpm,Rstring,RstrCab,RstrCu,Rconn,Rpar,Itot,Iavg,IavgStr,Imax,Imin,ImaxStr,IminStr,
+          imb,totalLoss,totalLossBr,avgLoss,vdMax,worst,worstVd,segSum,cellsSeries,vString};
+}
+
+/* ============================= FORMAT ============================= */
+const f=(n,d=1)=>{if(!isFinite(n))return '—';return Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});};
+const mO=x=>f(x*1000,3);           // ohm -> milliohm
+const colScale=(t)=>{ // 0..1 green->yellow->orange->red
+  t=Math.max(0,Math.min(1,t));
+  const stops=[[34,197,94],[234,179,8],[249,115,22],[239,68,68]];
+  const seg=t*3, i=Math.min(2,Math.floor(seg)), f2=seg-i;
+  const a=stops[i],bb=stops[i+1];
+  return `rgb(${Math.round(a[0]+(bb[0]-a[0])*f2)},${Math.round(a[1]+(bb[1]-a[1])*f2)},${Math.round(a[2]+(bb[2]-a[2])*f2)})`;
+};
+const tCur=(x,m)=> (m.Imax===m.Imin)?0.5:(x.I-m.Imin)/(m.Imax-m.Imin);
+
+/* ============================= TABS ============================= */
+const TABS=[['dash','Dashboard'],['input','Input Data'],['calc','Cable Calculation'],
+  ['dist','Current Distribution'],['scn','Scenario'],['opt','Optimization'],
+  ['viz','3D / 2D Layout'],['sens','Sensitivity'],['notes','Assumptions']];
+let activeTab='dash';
+function buildTabs(){
+  const n=document.getElementById('tabs');
+  n.innerHTML=TABS.map((t,i)=>`<button data-t="${t[0]}" class="${t[0]===activeTab?'active':''}"><span class="n">${String(i+1).padStart(2,'0')}</span>${t[1]}</button>`).join('');
+  n.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{activeTab=btn.dataset.t;syncTabs();renderAll();});
+}
+function syncTabs(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.t===activeTab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===activeTab));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ============================= INPUT BINDING ============================= */
+function setVal(id,v){const e=document.getElementById(id);if(e)e.value=v;}
+function fillInputs(){
+  setVal('Vbus',S.Vbus);setVal('Ppcs',S.Ppcs);setVal('Idirect',S.Idirect);
+  setVal('Rkm',S.Rkm);setVal('Tref',S.Tref);setVal('rho',S.rho);setVal('area',S.area);
+  setVal('Tcond',S.Tcond);setVal('alpha',S.alpha);setVal('nPar',S.nPar);setVal('feederK',S.feederK);
+  setVal('Rc',S.Rc);setVal('nC',S.nC);setVal('Rpack',S.Rpack);setVal('rackSegs',S.rackSegs);
+  setVal('amp',S.amp);setVal('vdLim',S.vdLim);setVal('imbLim',S.imbLim);setVal('lenLim',S.lenLim);
+  setVal('nBranch',S.lengths.length);
+  setVal('stringsPerRack',S.stringsPerRack);setVal('packsPerString',S.packsPerString);
+  setVal('cellsPerPack',S.cellsPerPack);setVal('vCell',S.vCell);
+  document.querySelectorAll('#designPreset button, #designPresetDash button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.design));
+  document.querySelectorAll('#curMode button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.curMode));
+  document.getElementById('fPower').style.display=S.curMode==='power'?'':'none';
+  document.getElementById('fDirect').style.display=S.curMode==='direct'?'':'none';
+  document.querySelectorAll('#resMode button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.resMode));
+  document.getElementById('gSheet').style.display=S.resMode==='datasheet'?'':'none';
+  document.getElementById('gCalc').style.display=S.resMode==='calc'?'':'none';
+  setVal('opMin',S.optMin??1000);setVal('opMax',S.optMax??S.lenLim);setVal('opTgt',S.optTgt??5);
+  setVal('sPts',S.sPts??'0.8,0.9,1.0,1.1,1.2');
+  document.getElementById('sParam').value=S.sParam||'len';
+}
+function bindNum(id,key,isInt){
+  const e=document.getElementById(id); if(!e)return;
+  e.addEventListener('input',()=>{let v=parseFloat(e.value);if(!isNaN(v)){S[key]=isInt?Math.round(v):v;save();renderAll();}});
+}
+function bindInputs(){
+  [['Vbus','Vbus'],['Ppcs','Ppcs'],['Idirect','Idirect'],['Rkm','Rkm'],['Tref','Tref'],['rho','rho'],
+   ['area','area'],['Tcond','Tcond'],['alpha','alpha'],['nPar','nPar',1],['feederK','feederK'],
+   ['Rc','Rc'],['nC','nC',1],['Rpack','Rpack'],['amp','amp'],['vdLim','vdLim'],['imbLim','imbLim'],['lenLim','lenLim'],
+   ['stringsPerRack','stringsPerRack',1],['packsPerString','packsPerString',1],['cellsPerPack','cellsPerPack',1],['vCell','vCell']
+  ].forEach(a=>bindNum(a[0],a[1],a[2]));
+  document.getElementById('rackSegs').addEventListener('input',e=>{S.rackSegs=e.target.value;save();renderAll();});
+  document.querySelectorAll('#designPreset button, #designPresetDash button').forEach(b=>b.onclick=()=>applyPreset(b.dataset.v));
+  document.querySelectorAll('#curMode button').forEach(b=>b.onclick=()=>{S.curMode=b.dataset.v;save();fillInputs();renderAll();});
+  document.querySelectorAll('#resMode button').forEach(b=>b.onclick=()=>{S.resMode=b.dataset.v;save();fillInputs();renderAll();});
+  document.getElementById('nBranch').addEventListener('input',e=>{
+    let n=Math.max(1,Math.min(48,Math.round(parseFloat(e.target.value)||1)));
+    const cur=S.lengths.length;
+    if(n>cur){for(let i=cur;i<n;i++)S.lengths.push(S.lengths[cur-1]||2000);}
+    else if(n<cur){S.lengths=S.lengths.slice(0,n);}
+    scn.B=S.lengths.slice();scn.C=S.lengths.slice();save();renderAll();
+  });
+  document.getElementById('resetBtn').onclick=()=>{applyPreset(S.design||'d1');};
+  document.getElementById('saveBtn').onclick=()=>{save();const b=document.getElementById('saveBtn');b.textContent='Saved ✓';setTimeout(()=>b.textContent='Save inputs',1200);};
+  // optimization + sensitivity controls
+  ['opMin','opMax','opTgt'].forEach(id=>document.getElementById(id).addEventListener('input',e=>{S[{opMin:'optMin',opMax:'optMax',opTgt:'optTgt'}[id]]=parseFloat(e.target.value);save();}));
+  document.getElementById('opRun').onclick=runOpt;
+  document.getElementById('sParam').addEventListener('change',e=>{S.sParam=e.target.value;save();renderSens();});
+  document.getElementById('sPts').addEventListener('input',e=>{S.sPts=e.target.value;save();renderSens();});
+  document.getElementById('scnSyncA').onclick=()=>{renderScenario();};
+  document.getElementById('scnCopyB').onclick=()=>{scn.B=S.lengths.slice();scn.C=S.lengths.slice();renderScenario();};
+}
+
+/* ============================= RENDER: length table (input) ============================= */
+function renderLenTable(m){
+  const tb=document.querySelector('#lenTable tbody');
+  tb.innerHTML=m.b.map((x,i)=>`<tr>
+    <td>${x.name}</td>
+    <td class="edit"><input type="number" data-i="${i}" value="${x.L}" step="50"></td>
+    <td>${mO(x.Rf)}</td><td>${mO(x.Rbr)}</td>
+    <td>${f(x.share,1)}%</td>
+    <td>${f(x.I,1)}<span class="cbar" style="width:${Math.max(4,x.share*3)}px;background:${colScale(tCur(x,m))}"></span></td>
+  </tr>`).join('');
+  tb.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',e=>{
+    const i=+e.target.dataset.i,v=parseFloat(e.target.value);
+    if(!isNaN(v)){S.lengths[i]=v;save();renderAll();}
+  }));
+}
+
+/* ============================= RENDER: KPI strip + cards ============================= */
+function renderKPIstrip(m){
+  const warn=buildWarnings(m).some(w=>w.bad);
+  const el=document.getElementById('kpistrip');
+  const imbBad=m.imb>S.imbLim, vdBad=(m.vdMax/S.Vbus*100)>S.vdLim;
+  const ampBad=m.Imax>S.amp;
+  el.innerHTML=`
+    <div class="kpi"><div class="k">Arrangement</div><div class="v" style="font-size:15px">${m.N}×${m.k} <span class="u">${m.nStrings} strings</span></div></div>
+    <div class="kpi ${ampBad?'alert':''}"><div class="k">Max feeder current</div><div class="v">${f(m.Imax,0)} <span class="u">A</span></div></div>
+    <div class="kpi"><div class="k">Max string current</div><div class="v">${f(m.ImaxStr,0)} <span class="u">A</span></div></div>
+    <div class="kpi ${imbBad?'alert':'good'}"><div class="k">Current imbalance</div><div class="v">${f(m.imb,1)} <span class="u">%</span></div></div>
+    <div class="kpi ${vdBad?'alert':''}"><div class="k">Max feeder V-drop</div><div class="v">${f(m.vdMax,2)} <span class="u">V</span></div></div>
+    <div class="kpi"><div class="k">Total cable loss</div><div class="v">${f(m.totalLoss,0)} <span class="u">W</span></div></div>
+    <div class="kpi ${warn?'alert':'good'}"><div class="k">Checks</div><div class="v">${warn?'REVIEW':'OK'}</div></div>`;
+}
+function renderCards(m){
+  const el=document.getElementById('kcards');
+  const imbBad=m.imb>S.imbLim;
+  const cards=[
+    ['Total DC current',f(m.Itot,0),'A',m.N+' racks × '+m.k+' strings = '+m.nStrings],
+    ['Max feeder current',f(m.Imax,0),'A',m.worst.name+(m.k>1?' · carries '+m.k+' strings':''), m.Imax>S.amp?'warn':''],
+    ['Max string current',f(m.ImaxStr,0),'A','per-string, in the 4/8-pack cable'],
+    ['Avg string current',f(m.IavgStr,1),'A','I_total / '+m.nStrings+' strings'],
+    ['Current imbalance',f(m.imb,1),'%','string-to-string · limit '+S.imbLim+'%',imbBad?'warn':'good'],
+    ['Total cable loss',f(m.totalLoss,0),'W','feeders + strings, Σ I²R'],
+    ['Max feeder V-drop',f(m.vdMax,2),'V',f(m.vdMax/S.Vbus*100,2)+'% of bus',(m.vdMax/S.Vbus*100>S.vdLim)?'warn':''],
+    ['Nominal string V',m.vString?f(m.vString,0):'—',m.vString?'V':'',m.cellsSeries?m.cellsSeries+'S × '+f(S.vCell,2)+' V/cell':'set cell data']
+  ];
+  el.innerHTML=cards.map(c=>`<div class="kcard ${c[4]||''}">
+    <div class="k">${c[0]}</div><div class="v">${c[1]} <span class="u">${c[2]}</span></div>
+    <div class="sub">${c[3]}</div></div>`).join('');
+}
+
+/* ============================= WARNINGS ============================= */
+function buildWarnings(m){
+  const out=[];
+  const vdMaxPct=m.vdMax/S.Vbus*100;
+  out.push({bad:m.imb>S.imbLim, t:m.imb>S.imbLim
+    ? `Current imbalance ${f(m.imb,1)}% exceeds the ${S.imbLim}% limit. Spread driven by the ${f(S.lengths[m.worst.i===undefined?0:0])}… feeder-length range; consider pack-resistance sharing or routing equalisation.`
+    : `Current imbalance ${f(m.imb,1)}% is within the ${S.imbLim}% limit.`});
+  out.push({bad:vdMaxPct>S.vdLim, t:vdMaxPct>S.vdLim
+    ? `Feeder voltage drop ${f(m.vdMax,2)} V (${f(vdMaxPct,2)}%) on ${m.worstVd.name} exceeds the ${S.vdLim}% limit.`
+    : `Max feeder voltage drop ${f(vdMaxPct,2)}% is within the ${S.vdLim}% limit.`});
+  out.push({bad:m.Imax>S.amp, t:m.Imax>S.amp
+    ? `Feeder current ${f(m.Imax,1)} A on ${m.worst.name}${m.k>1?' (carrying '+m.k+' strings)':''} exceeds the ${S.amp} A ampacity. Verify feeder size / derating.`
+    : `Max feeder current ${f(m.Imax,1)} A is within the ${S.amp} A ampacity.`});
+  if(m.k>1){
+    out.push({bad:m.ImaxStr>S.amp, t:m.ImaxStr>S.amp
+      ? `Per-string current ${f(m.ImaxStr,1)} A exceeds the ${S.amp} A ampacity of the string cable.`
+      : `Per-string current ${f(m.ImaxStr,1)} A is within the ${S.amp} A string-cable ampacity (feeder carries ${m.k}× this).`});
+  }
+  const hiLoss=m.b.filter(x=>x.loss>2*m.avgLoss);
+  out.push({bad:hiLoss.length>0, t:hiLoss.length>0
+    ? `Cable loss on ${hiLoss.map(x=>x.name).join(', ')} is >2× the branch average (${f(m.avgLoss,0)} W).`
+    : `No branch exceeds 2× average cable loss (${f(m.avgLoss,0)} W).`});
+  const overLen=m.b.filter(x=>x.L>S.lenLim);
+  out.push({bad:overLen.length>0, t:overLen.length>0
+    ? `Feeder length exceeds the ${S.lenLim} mm routing limit on ${overLen.map(x=>x.name).join(', ')}.`
+    : `All feeder lengths are within the ${S.lenLim} mm routing limit.`});
+  return out;
+}
+function renderWarnings(m){
+  const el=document.getElementById('warnlist');
+  el.innerHTML=buildWarnings(m).map(w=>`<div class="wrow ${w.bad?'w':'ok'}"><span class="ic">${w.bad?'⚠':'✓'}</span><span>${w.bad?'<b>WARNING</b> — ':''}${w.t}</span></div>`).join('');
+}
+
+/* ============================= CALC + BAL TABLES ============================= */
+function renderCalc(m){
+  document.getElementById('o_rpm').textContent=f(m.rpm*1000,4)+' mΩ/m';
+  document.getElementById('o_rpmloop').textContent=f(m.rpm*S.feederK*1000,4)+' mΩ/m';
+  document.getElementById('o_rrack').textContent=mO(m.RstrCab)+' mΩ';
+  document.getElementById('o_rconn').textContent=mO(m.Rconn)+' mΩ';
+  document.getElementById('o_rpar').textContent=mO(m.Rpar)+' mΩ';
+  document.getElementById('o_itot').textContent=f(m.Itot,0)+' A';
+  document.getElementById('o_iavg').textContent=f(m.Iavg,1)+' A (feeder) · '+f(m.IavgStr,1)+' A (string)';
+  document.getElementById('o_imax').textContent=f(m.Imax,1)+' A feeder ('+m.worst.name+') · '+f(m.ImaxStr,1)+' A string';
+  document.getElementById('o_imin').textContent=f(m.Imin,1)+' A feeder · '+f(m.IminStr,1)+' A string';
+  document.getElementById('o_imb').textContent=f(m.imb,1)+' %';
+  document.getElementById('o_loss').textContent=f(m.totalLoss,0)+' W';
+  document.getElementById('o_vdmax').textContent=f(m.vdMax,2)+' V';
+  const tb=document.querySelector('#calcTable tbody');
+  tb.innerHTML=m.b.map(x=>`<tr>
+    <td>${x.name}</td><td>${f(x.L,0)}</td><td>${mO(x.Rf)}</td><td>${mO(x.Rbr)}</td>
+    <td style="color:${colScale(tCur(x,m))}">${f(x.I,1)}${m.k>1?' <span style="color:var(--muted2)">('+f(x.Istring,1)+'/str)</span>':''}</td><td>${f(x.share,2)}</td>
+    <td>${f(x.vdFeeder,3)} / ${f(x.vdPct,3)}%</td><td>${f(x.loss,1)}</td>
+    <td style="color:${x.dev>0?'var(--limit)':'var(--muted)'}">${x.dev>0?'+':''}${f(x.dev,1)}</td></tr>`).join('');
+  document.querySelector('#calcTable tfoot').innerHTML=`<tr>
+    <td>Totals / extremes</td><td>Σ ${f(m.b.reduce((a,x)=>a+x.L,0),0)}</td><td></td><td></td>
+    <td>Σ ${f(m.Itot,0)}</td><td>100.00</td><td>max ${f(m.vdMax,3)} V</td><td>Σ ${f(m.totalLoss,0)}</td>
+    <td>${f(m.imb,1)}% imb</td></tr>`;
+  // balancing table (distribution tab)
+  const bt=document.querySelector('#balTable tbody');
+  bt.innerHTML=m.b.map(x=>`<tr>
+    <td>${x.name}</td><td>${f(x.L,0)}</td><td>${mO(x.Rbr)}</td>
+    <td style="color:${colScale(tCur(x,m))}">${f(x.I,1)}</td><td>${f(x.share,2)}</td>
+    <td>${f(x.vdFeeder,3)}</td><td>${f(x.loss,1)}</td>
+    <td style="color:${x.dev>0?'var(--limit)':'var(--ok)'}">${x.dev>0?'+':''}${f(x.dev,1)}</td></tr>`).join('');
+  document.querySelector('#balTable tfoot').innerHTML=`<tr>
+    <td>Average / total</td><td></td><td>${mO(m.Rpar)} ∥</td><td>avg ${f(m.Iavg,1)}</td><td></td>
+    <td>max ${f(m.vdMax,3)}</td><td>Σ ${f(m.totalLoss,0)}</td><td>${f(m.imb,1)}% imb</td></tr>`;
+}
+
+/* ============================= CHARTS ============================= */
+const CH={};
+const hasChart=()=>typeof Chart!=='undefined';
+if(hasChart()){Chart.defaults.color='#92a6bb';Chart.defaults.font.family="'IBM Plex Mono',monospace";Chart.defaults.font.size=10;Chart.defaults.borderColor='#26384c';}
+function mk(id,cfg){if(!hasChart())return;if(CH[id])CH[id].destroy();const c=document.getElementById(id);if(!c)return;CH[id]=new Chart(c,cfg);}
+function barCfg(labels,data,colors,yTitle,fmt){
+  return {type:'bar',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>' '+(fmt?fmt(c.parsed.y):c.parsed.y)}}},
+    scales:{y:{title:{display:!!yTitle,text:yTitle},grid:{color:'#1c2a3a'}},x:{grid:{display:false}}}}};
+}
+function renderCharts(m){
+  if(!hasChart())return;
+  const labels=m.b.map(x=>x.name.replace('HV Box ','HV'));
+  const cols=m.b.map(x=>colScale(tCur(x,m)));
+  mk('c_dist',barCfg(labels,m.b.map(x=>+x.I.toFixed(1)),cols,'Current (A)',v=>v+' A'));
+  // length vs current (scatter)
+  mk('c_lenI',{type:'scatter',data:{datasets:[{data:m.b.map(x=>({x:x.L,y:+x.I.toFixed(1),n:x.name})),
+      pointBackgroundColor:cols,pointRadius:6,pointHoverRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${c.raw.n}: ${c.raw.x} mm → ${c.raw.y} A`}}},
+      scales:{x:{title:{display:true,text:'Feeder length (mm)'},grid:{color:'#1c2a3a'}},
+              y:{title:{display:true,text:'Current (A)'},grid:{color:'#1c2a3a'}}}}});
+  // resistance vs length
+  mk('c_resLen',{type:'scatter',data:{datasets:[{data:m.b.map(x=>({x:x.L,y:+(x.Rbr*1000).toFixed(3),n:x.name})),
+      pointBackgroundColor:'#2dd4bf',pointRadius:5,showLine:true,borderColor:'#19606055',borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${c.raw.n}: ${c.raw.x} mm → ${c.raw.y} mΩ`}}},
+      scales:{x:{title:{display:true,text:'Feeder length (mm)'},grid:{color:'#1c2a3a'}},
+              y:{title:{display:true,text:'Branch R (mΩ)'},grid:{color:'#1c2a3a'}}}}});
+  mk('c_vd',barCfg(labels,m.b.map(x=>+x.vdFeeder.toFixed(3)),m.b.map(x=>x.vdFeeder>S.Vbus*S.vdLim/100?'#ef4444':'#22b8cb'),'V',v=>v+' V'));
+  mk('c_loss',barCfg(labels,m.b.map(x=>+x.loss.toFixed(1)),m.b.map(x=>x.loss>2*m.avgLoss?'#f97316':'#2dd4bf'),'W',v=>v+' W'));
+}
+
+/* ============================= GAUGE ============================= */
+function renderGauge(m){
+  const el=document.getElementById('gauge');
+  const lim=S.imbLim, val=m.imb;
+  const max=Math.max(lim*2,val*1.1,10);
+  const W=260,H=150,cx=130,cy=135,r=105;
+  const a0=Math.PI,a1=0; // 180° to 0°
+  function pt(ang,rr){return [cx+rr*Math.cos(ang),cy-rr*Math.sin(ang)];}
+  function arc(from,to,rr){const p0=pt(from,rr),p1=pt(to,rr);const large=(from-to)>Math.PI?1:0;return `M${p0[0]} ${p0[1]} A ${rr} ${rr} 0 ${large} 1 ${p1[0]} ${p1[1]}`;}
+  const frac=Math.min(1,val/max), ang=a0-(a0-a1)*frac;
+  const limFrac=Math.min(1,lim/max), limAng=a0-(a0-a1)*limFrac;
+  let segs='';const steps=40;
+  for(let i=0;i<steps;i++){const t0=i/steps,t1=(i+1)/steps;const A=a0-(a0-a1)*t0,B=a0-(a0-a1)*t1;
+    segs+=`<path d="${arc(A,B,r)}" stroke="${colScale(t0)}" stroke-width="12" fill="none" opacity="0.28"/>`;}
+  const nd=pt(ang,r-4);
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:300px">
+    ${segs}
+    <path d="${arc(a0,ang,r)}" stroke="${colScale(frac)}" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${cy}" x2="${nd[0]}" y2="${nd[1]}" stroke="#e8eef5" stroke-width="2.5"/>
+    <circle cx="${cx}" cy="${cy}" r="5" fill="#e8eef5"/>
+    <line x1="${pt(limAng,r+8)[0]}" y1="${pt(limAng,r+8)[1]}" x2="${pt(limAng,r-14)[0]}" y2="${pt(limAng,r-14)[1]}" stroke="#ff8f6b" stroke-width="2" stroke-dasharray="3 2"/>
+    <text x="${cx}" y="${cy-34}" text-anchor="middle" style="font-family:var(--mono);font-size:30px;font-weight:600;fill:${val>lim?'#ff5b6e':'#36c98a'}">${f(val,1)}%</text>
+    <text x="${cx}" y="${cy-12}" text-anchor="middle" class="vz-label">imbalance · limit ${lim}%</text>
+  </svg>`;
+  document.getElementById('gaugeNote').textContent = val>lim
+    ? `Exceeds limit by ${f(val-lim,1)} pts. ${m.worst.name} carries ${f(m.worst.share,1)}% of current.`
+    : `Within the ${lim}% limit — spread ${f(m.Imax-m.Imin,1)} A across branches.`;
+}
+
+/* ============================= ROUTE SVG ============================= */
+function routeSVG(m,{compact=false}={}){
+  const N=m.N;
+  const rowH=compact?26:34, top=40, left=170, len=compact?260:360, right=left+len+120;
+  const H=top+N*rowH+30, W=right+30;
+  const maxL=Math.max(...m.b.map(x=>x.L));
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W,760)}px">`;
+  // cabinet
+  const cabY=top-10, cabH=N*rowH-10;
+  s+=`<rect x="20" y="${cabY}" width="92" height="${cabH}" rx="8" fill="#13212f" stroke="#31465e"/>
+      <text x="66" y="${cabY+cabH/2-8}" text-anchor="middle" class="vz-label" style="font-size:11px;fill:#e8eef5">Combine</text>
+      <text x="66" y="${cabY+cabH/2+8}" text-anchor="middle" class="vz-label" style="font-size:11px;fill:#e8eef5">Cabinet</text>
+      <text x="66" y="${cabY+cabH-14}" text-anchor="middle" class="vz-val" style="fill:#2dd4bf">${f(m.Itot,0)} A</text>`;
+  // bus
+  s+=`<line x1="112" y1="${top}" x2="112" y2="${top+(N-1)*rowH}" stroke="#2dd4bf" stroke-width="2" opacity="0.5"/>`;
+  m.b.forEach((x,i)=>{
+    const y=top+i*rowH;
+    const t=tCur(x,m), col=colScale(t);
+    const w=1.4+t*7;
+    const lx=left + (x.L/maxL)*len;        // branch length visual
+    const title=`${x.name}  (${m.k} string${m.k>1?'s':''})\nFeeder ${f(x.L,0)} mm (loop ${S.feederK}×) · R ${mO(x.Rf)} mΩ\nFeeder current ${f(x.I,1)} A  (${f(x.share,1)}%)\nPer-string current ${f(x.Istring,1)} A\nFeeder V-drop ${f(x.vdFeeder,3)} V  |  Loss ${f(x.loss,1)} W`;
+    s+=`<g><title>${title}</title>
+      <line x1="112" y1="${y}" x2="${lx}" y2="${y}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
+    // arrow
+    const ax=lx;
+    s+=`<path d="M${ax-9} ${y-4-w/2} L${ax} ${y} L${ax-9} ${y+4+w/2} Z" fill="${col}"/>`;
+    // hv box glyph
+    s+=`<rect x="${lx+6}" y="${y-8}" width="16" height="16" rx="3" fill="#182636" stroke="${col}"/>`;
+    // k string stacks (each a short bank of pack cells)
+    const kk=Math.max(1,m.k), pk=Math.min(S.packsPerString||4,6);
+    for(let st=0; st<kk; st++){
+      const sy=y-6-(kk-1)*5 + st*10;
+      for(let p=0;p<pk;p++) s+=`<rect x="${lx+26+p*6}" y="${sy}" width="4.5" height="8" rx="1" fill="${col}" opacity="${0.4+0.1*p}"/>`;
+    }
+    // labels
+    s+=`<text x="${lx+30+((S.packsPerString||4)<6?(S.packsPerString||4):6)*6+8}" y="${y}" class="vz-val" style="fill:#e8eef5">${x.name.replace('HV Box ','HV')} · ${f(x.I,0)}A${m.k>1?' ('+f(x.Istring,0)+'/str)':''}</text>`;
+    s+=`<text x="112" y="${y-rowH/2+6}" class="vz-label" style="display:${compact?'none':''}"> </text>`;
+    if(!compact) s+=`<text x="${(112+lx)/2}" y="${y-7}" text-anchor="middle" class="vz-label">${f(x.L,0)} mm · ${f(x.share,1)}%</text>`;
+    s+=`</g>`;
+  });
+  s+=`</svg>`;
+  return s;
+}
+function renderRoute(m){
+  document.getElementById('route').innerHTML=routeSVG(m,{compact:false});
+  document.getElementById('routeMini').innerHTML=routeSVG(m,{compact:true});
+  const lg=legendHTML(m);
+  document.getElementById('legendRoute').innerHTML=lg;
+  document.getElementById('legendMini').innerHTML=lg;
+}
+function legendHTML(m){
+  return `<span class="sw" style="background:var(--g)"></span>Low ${f(m.Imin,0)} A
+    <span class="sw" style="background:var(--y);margin-left:10px"></span>Moderate
+    <span class="sw" style="background:var(--o);margin-left:10px"></span>High
+    <span class="sw" style="background:var(--r);margin-left:10px"></span>Highest ${f(m.Imax,0)} A
+    <span style="margin-left:14px;color:var(--muted2)">line weight ∝ current · hover for detail</span>`;
+}
+
+/* ============================= ISOMETRIC CONTAINER ============================= */
+function renderIso(m){
+  const N=m.N;
+  // layout racks in two rows along the container
+  const perRow=Math.ceil(N/2);
+  const W=860,H=360;
+  const ox=120,oy=150, ux=26,uy=13, rw=46, gap=10; // iso unit
+  function iso(x,y,z){return [ox + (x-y)*ux, oy + (x+y)*uy - z];}
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:720px">`;
+  // container floor
+  const corners=[iso(-1,-1,0),iso(perRow*1.2+1,-1,0),iso(perRow*1.2+1,3,0),iso(-1,3,0)];
+  s+=`<polygon points="${corners.map(p=>p.join(',')).join(' ')}" fill="#0f1c28" stroke="#31465e"/>`;
+  s+=`<text x="${ox}" y="26" class="vz-label" style="font-size:11px">20-ft container · duct along top rail · colour = branch current</text>`;
+  // combine cabinet at the near-left end
+  function box(gx,gy,h,col,label,sub){
+    const b=iso(gx,gy,0),t=iso(gx,gy,h),
+      r=iso(gx+1,gy,0),rt=iso(gx+1,gy,h),
+      f2=iso(gx,gy+1,0),ft=iso(gx,gy+1,h),
+      c=iso(gx+1,gy+1,0),ct=iso(gx+1,gy+1,h);
+    let g='';
+    // left face
+    g+=`<polygon points="${b.join(',')} ${f2.join(',')} ${ft.join(',')} ${t.join(',')}" fill="${shade(col,-28)}"/>`;
+    // right face
+    g+=`<polygon points="${f2.join(',')} ${c.join(',')} ${ct.join(',')} ${ft.join(',')}" fill="${shade(col,-14)}"/>`;
+    // top
+    g+=`<polygon points="${t.join(',')} ${ft.join(',')} ${ct.join(',')} ${rt.join(',')}" fill="${col}"/>`;
+    if(label)g+=`<text x="${ft[0]}" y="${ft[1]+12}" text-anchor="middle" class="vz-val" style="fill:#dfe9f2;font-size:9px">${label}</text>`;
+    if(sub)g+=`<text x="${ft[0]}" y="${ft[1]+22}" text-anchor="middle" class="vz-label" style="font-size:8px">${sub}</text>`;
+    return g;
+  }
+  s+=box(-0.9,0.1,44,'#1f3346','CCab',f(m.Itot,0)+'A');
+  m.b.forEach((x,i)=>{
+    const row=i<perRow?0:1, idx=i%perRow;
+    const gx=idx*1.2+0.4, gy=row*1.8+0.2;
+    const col=colScale(tCur(x,m));
+    const h=20+tCur(x,m)*34;
+    s+=`<g><title>${x.name} · ${f(x.I,1)} A · ${f(x.share,1)}% · ${mO(x.Rbr)} mΩ · ${f(x.vdFeeder,3)} V</title>`;
+    s+=box(gx,gy,h,col,'HV'+(i+1),f(x.I,0)+'A');
+    s+=`</g>`;
+  });
+  s+=`</svg>`;
+  document.getElementById('iso').innerHTML=s;
+  document.getElementById('legendIso').innerHTML=legendHTML(m)+' · bar height ∝ current';
+}
+function shade(rgb,amt){const m2=rgb.match(/\d+/g);if(!m2)return rgb;return `rgb(${m2.map(v=>Math.max(0,Math.min(255,+v+amt))).join(',')})`;}
+
+/* ============================= SCENARIO ============================= */
+function renderScenario(){
+  const N=S.lengths.length;
+  // ensure B,C sized
+  while(scn.B.length<N)scn.B.push(S.lengths[scn.B.length]||2000);
+  while(scn.C.length<N)scn.C.push(S.lengths[scn.C.length]||2000);
+  scn.B=scn.B.slice(0,N);scn.C=scn.C.slice(0,N);
+  const tb=document.querySelector('#scnEdit tbody');
+  tb.innerHTML=S.lengths.map((L,i)=>`<tr><td>HV Box ${i+1}</td>
+    <td>${f(L,0)}</td>
+    <td class="edit"><input type="number" data-s="B" data-i="${i}" value="${scn.B[i]}" step="50"></td>
+    <td class="edit"><input type="number" data-s="C" data-i="${i}" value="${scn.C[i]}" step="50"></td></tr>`).join('');
+  tb.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',e=>{
+    const v=parseFloat(e.target.value);if(!isNaN(v)){scn[e.target.dataset.s][+e.target.dataset.i]=v;drawScenario();}
+  }));
+  drawScenario();
+}
+function drawScenario(){
+  const A=compute(S.lengths), B=compute(scn.B), C=compute(scn.C);
+  const base=A;
+  function card(name,m,kind){
+    const dL=m.b.reduce((a,x)=>a+x.L,0), dLb=base.b.reduce((a,x)=>a+x.L,0);
+    function diff(v,b,unit,inv){const d=v-b;const cls=(inv?d<0:d>0)?'diff-pos':'diff-neg';
+      return base===m?'':`<span class="${Math.abs(d)<1e-9?'':cls}" style="font-size:11px"> (${d>0?'+':''}${f(d,1)}${unit})</span>`;}
+    return `<div class="scn"><h4>${name}${kind?`<span class="pill">${kind}</span>`:''}</h4>
+      <div class="kv" style="margin-top:8px">
+        <dt>Imbalance</dt><dd>${f(m.imb,1)}%${diff(m.imb,base.imb,' pt',false)}</dd>
+        <dt>Total loss</dt><dd>${f(m.totalLoss,0)} W${diff(m.totalLoss,base.totalLoss,' W',false)}</dd>
+        <dt>Max V-drop</dt><dd>${f(m.vdMax,2)} V${diff(m.vdMax,base.vdMax,' V',false)}</dd>
+        <dt>Max branch I</dt><dd>${f(m.Imax,1)} A${diff(m.Imax,base.Imax,' A',false)}</dd>
+        <dt>Total cable</dt><dd>${f(dL/1000,2)} m${diff(dL/1000,dLb/1000,' m',false)}</dd>
+      </div></div>`;
+  }
+  document.getElementById('scnCards').innerHTML=card('Scenario A',A,'baseline')+card('Scenario B',B,'optimised')+card('Scenario C',C,'user');
+  if(hasChart()){
+    const labels=A.b.map(x=>x.name.replace('HV Box ','HV'));
+    mk('c_scn',{type:'bar',data:{labels,datasets:[
+      {label:'A existing',data:A.b.map(x=>+x.I.toFixed(1)),backgroundColor:'#2dd4bf'},
+      {label:'B optimised',data:B.b.map(x=>+x.I.toFixed(1)),backgroundColor:'#8bb4ff'},
+      {label:'C user',data:C.b.map(x=>+x.I.toFixed(1)),backgroundColor:'#f5b84a'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} A`}}},
+        scales:{y:{title:{display:true,text:'Current (A)'},grid:{color:'#1c2a3a'}},x:{grid:{display:false}}}}});
+  }
+}
+
+/* ============================= OPTIMIZATION ============================= */
+function runOpt(){
+  const min=S.optMin??1000, max=S.optMax??S.lenLim, tgt=S.optTgt??5;
+  const base=compute(S.lengths);
+  // equalise: raise each branch R toward Rmax by padding feeder length (cap at max length)
+  const rpm=base.rpm, Rother=base.Rrack+base.Rconn+(S.Rpack||0);
+  const Rtarget=Math.max(...base.b.map(x=>x.Rbr)); // longest branch
+  // feeder length needed so that Rbr=Rtarget: Rf=Rtarget-Rother ; Lf=Rf/(rpm*feederK)*1000
+  let out=S.lengths.map((L,i)=>{
+    let need=(Rtarget-Rother)/(rpm*S.feederK)*1000;
+    need=Math.max(L,need);               // only pad, never shorten below real length
+    need=Math.min(max,Math.max(min,need));
+    return Math.max(L,Math.round(need));
+  });
+  // iterate toward target imbalance by relaxing padding if target already beaten
+  let opt=compute(out);
+  const resEl=document.getElementById('opResult');
+  const dLoss=opt.totalLoss-base.totalLoss, dLen=(out.reduce((a,b)=>a+b,0)-S.lengths.reduce((a,b)=>a+b,0))/1000;
+  const feasible=opt.b.every(x=>x.L<=max+0.5);
+  resEl.innerHTML=`
+    <div class="grid cols-3">
+      <div class="kcard ${opt.imb<=tgt?'good':''}"><div class="k">Imbalance after</div><div class="v">${f(opt.imb,1)}<span class="u">%</span></div><div class="sub">was ${f(base.imb,1)}% · target ${tgt}%</div></div>
+      <div class="kcard warn"><div class="k">Extra cable</div><div class="v">${f(dLen,1)}<span class="u">m</span></div><div class="sub">added to short branches</div></div>
+      <div class="kcard warn"><div class="k">Extra loss</div><div class="v">${dLoss>0?'+':''}${f(dLoss,0)}<span class="u">W</span></div><div class="sub">cost of equalisation</div></div>
+    </div>
+    <div class="tablewrap" style="margin-top:12px"><table><thead><tr>
+      <th>HV Box</th><th>Length now (mm)</th><th>Length equalised (mm)</th><th>Δ (mm)</th><th>I now (A)</th><th>I equalised (A)</th></tr></thead>
+      <tbody>${S.lengths.map((L,i)=>`<tr><td>HV Box ${i+1}</td><td>${f(L,0)}</td><td>${f(out[i],0)}</td>
+        <td style="color:${out[i]>L?'var(--limit)':'var(--muted)'}">${out[i]>L?'+':''}${f(out[i]-L,0)}</td>
+        <td>${f(base.b[i].I,1)}</td><td>${f(opt.b[i].I,1)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="note">${feasible?'':'<b>Some branches hit the max-length cap</b> — full equalisation not reachable within limits. '}
+      Mathematical scenario only — equalising resistance reduces imbalance at the cost of added copper and loss. In practice, prefer matched routing, busbar design, or pack-level balancing. Engineering design is unchanged.</div>`;
+}
+
+/* ============================= SENSITIVITY ============================= */
+function renderSens(){
+  const param=S.sParam||'len';
+  const pts=(S.sPts||'0.8,0.9,1.0,1.1,1.2').split(',').map(x=>parseFloat(x)).filter(x=>!isNaN(x)&&x>0);
+  const rows=pts.map(k=>{
+    const saved={lengths:S.lengths.slice(),Vbus:S.Vbus,Ppcs:S.Ppcs,Idirect:S.Idirect,area:S.area};
+    let varied;
+    if(param==='len'){S.lengths=saved.lengths.map(L=>L*k);varied=f(k*100,0)+'% length';}
+    else if(param==='volt'){S.Vbus=saved.Vbus*k;varied=f(S.Vbus,0)+' V';}
+    else if(param==='power'){S.Ppcs=saved.Ppcs*k;S.Idirect=saved.Idirect*k;varied=f((S.curMode==='power'?S.Ppcs:S.Idirect),0)+(S.curMode==='power'?' kW':' A');}
+    else if(param==='area'){S.area=saved.area*k;varied=f(S.area,1)+' mm²';}
+    const m=compute();
+    Object.assign(S,saved); // restore
+    return {k,varied,m};
+  });
+  document.querySelector('#sensTable tbody').innerHTML=rows.map(r=>`<tr>
+    <td>×${f(r.k,2)}</td><td>${r.varied}</td><td>${f(r.m.Itot,0)}</td><td>${f(r.m.Imax,1)}</td><td>${f(r.m.Imin,1)}</td>
+    <td>${f(r.m.imb,1)}</td><td>${f(r.m.totalLoss,0)}</td><td>${f(r.m.vdMax,2)}</td></tr>`).join('');
+  if(hasChart()){
+    mk('c_sens',{type:'line',data:{labels:rows.map(r=>'×'+f(r.k,2)),datasets:[
+      {label:'Imbalance %',data:rows.map(r=>+r.m.imb.toFixed(1)),borderColor:'#f5b84a',backgroundColor:'#f5b84a',yAxisID:'y',tension:.25},
+      {label:'Total loss W',data:rows.map(r=>+r.m.totalLoss.toFixed(0)),borderColor:'#2dd4bf',backgroundColor:'#2dd4bf',yAxisID:'y1',tension:.25},
+      {label:'Max V-drop V',data:rows.map(r=>+r.m.vdMax.toFixed(2)),borderColor:'#8bb4ff',backgroundColor:'#8bb4ff',yAxisID:'y2',tension:.25}]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{position:'top'}},
+        scales:{y:{position:'left',title:{display:true,text:'Imbalance %'},grid:{color:'#1c2a3a'}},
+          y1:{position:'right',title:{display:true,text:'Loss W'},grid:{display:false}},
+          y2:{display:false}}}});
+  }
+}
+
+/* ============================= MASTER RENDER ============================= */
+function renderAll(){
+  const m=compute();
+  setVal('o_nstrings', m.N+' racks × '+m.k+' = '+m.nStrings+' strings');
+  document.querySelectorAll('#designPreset button, #designPresetDash button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.design));
+  const dashBar=document.getElementById('dashArrange');
+  if(dashBar) dashBar.textContent=`${m.N} racks × ${m.k} string${m.k>1?'s':''}/rack × ${S.packsPerString} packs = ${m.nStrings} strings in parallel`+(m.vString?` · ${f(m.vString,0)} V/string nominal`:'');
+  renderKPIstrip(m);
+  if(activeTab==='dash'){renderCards(m);renderWarnings(m);renderGauge(m);mk&&renderCharts(m);renderRoute(m);}
+  if(activeTab==='input'){renderLenTable(m);}
+  if(activeTab==='calc'){renderCalc(m);}
+  if(activeTab==='dist'){renderCalc(m);renderCharts(m);}
+  if(activeTab==='scn'){renderScenario();}
+  if(activeTab==='viz'){renderRoute(m);renderIso(m);}
+  if(activeTab==='sens'){renderSens();}
+  // always refresh route if on dash
+}
+
+/* ============================= EXCEL I/O ============================= */
+// key -> type: 'n' numeric, 's' string. Mirrors the Settings sheet 'Key' column.
+const XLKEYS={Vbus:'n',curMode:'s',Ppcs:'n',Idirect:'n',resMode:'s',Rkm:'n',Tref:'n',rho:'n',area:'n',
+  Tcond:'n',alpha:'n',nPar:'n',feederK:'n',Rc:'n',nC:'n',Rpack:'n',rackSegs:'s',
+  stringsPerRack:'n',packsPerString:'n',cellsPerPack:'n',vCell:'n',amp:'n',vdLim:'n',imbLim:'n',lenLim:'n'};
+// Ordered definition used to WRITE the template on export (label,key,unit,note)
+const XLDEF=[
+  ['— Arrangement —',null],
+  ['Strings per rack (k)','stringsPerRack','count','1 = single-string HV box, 2 = dual-string'],
+  ['Packs in series per string','packsPerString','count','sets string voltage & cabling hops'],
+  ['Cells in series per pack','cellsPerPack','count','104 for a 104S1P pack'],
+  ['Nominal cell voltage','vCell','V','~3.2 for LFP (informational)'],
+  ['— Operating point —',null],
+  ['DC bus voltage','Vbus','V','nominal bus / string voltage'],
+  ['Current source mode','curMode','power/direct',"'power' uses PCS kW; 'direct' uses current below"],
+  ['PCS DC power','Ppcs','kW','I_total = P / Vbus'],
+  ['Operating current (total)','Idirect','A','used only when mode = direct'],
+  ['— Conductor resistance —',null],
+  ['Resistance source','resMode','datasheet/calc',"'datasheet' uses ohm/km; 'calc' uses rho & area"],
+  ['Cable DC resistance','Rkm','ohm/km','REQUIRED - UL3932 2/0 AWG datasheet value'],
+  ['Datasheet reference temp','Tref','degC','temp the ohm/km value is quoted at'],
+  ['Resistivity rho (20C)','rho','ohm.mm2/m','copper ~0.0175 (calc mode)'],
+  ['Conductor cross-section','area','mm2','2/0 AWG ~67.43 (calc mode)'],
+  ['Operating conductor temp','Tcond','degC','resistance corrected to this temp'],
+  ['Temp coefficient alpha','alpha','1/degC','copper ~0.00393'],
+  ['Parallel cables per pole','nPar','count','divides conductor resistance'],
+  ['Return-conductor factor','feederK','x','x2 counts + and - feeder as the loop'],
+  ['— Connector & string internals (per string) —',null],
+  ['Connector resistance (each)','Rc','ohm','per connector; 0 = ignore'],
+  ['Connectors in series per string','nC','count',''],
+  ['String internal resistance','Rpack','ohm','one string DC resistance; 0 = cable-only worst case'],
+  ['String internal cabling segments','rackSegs','mm (csv)','one string loop HVBox->P1->..->Pn->HVBox'],
+  ['— Acceptance limits —',null],
+  ['Cable ampacity (per pole)','amp','A','after derating; checked vs feeder & string current'],
+  ['Allowable feeder voltage drop','vdLim','%','% of bus voltage'],
+  ['Allowable current imbalance','imbLim','%','(Max-Min)/Average'],
+  ['Max routing length','lenLim','mm','flags any feeder longer than this']
+];
+function xlStatus(msg,ok){const e=document.getElementById('xlStatus');if(!e)return;
+  e.innerHTML=msg; e.style.borderLeftColor=ok?'var(--ok)':'var(--accent)';}
+function hasXLSX(){return typeof XLSX!=='undefined';}
+function parseWorkbook(wb){
+  let applied=0;
+  const sName=wb.SheetNames.find(n=>/setting/i.test(n))||wb.SheetNames[0];
+  const sh=wb.Sheets[sName];
+  if(sh){
+    const rows=XLSX.utils.sheet_to_json(sh,{header:1,blankrows:false});
+    const hdr=rows.find(r=>r.some(c=>/^key/i.test((''+c).trim())));
+    const ki=hdr?hdr.findIndex(c=>/^key/i.test((''+c).trim())):3;
+    const vi=hdr?hdr.findIndex(c=>/^value/i.test((''+c).trim())):1;
+    rows.forEach(r=>{
+      const key=r[ki]!=null?(''+r[ki]).trim():'';
+      if(XLKEYS[key]!==undefined){
+        let v=r[vi];
+        if(XLKEYS[key]==='n'){v=parseFloat(v); if(!isNaN(v)){S[key]=v;applied++;}}
+        else{ if(v!=null&&(''+v).trim()!==''){S[key]=(''+v).trim();applied++;} }
+      }
+    });
+  }
+  const fName=wb.SheetNames.find(n=>/feeder/i.test(n));
+  if(fName){
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[fName],{header:1,blankrows:false});
+    const lens=[];
+    rows.forEach(r=>{
+      if(!r.some(c=>/^hv\s*box\s*\d+/i.test((''+(c==null?'':c)).trim()))) return; // only labelled rack rows
+      for(const c of r){ const v=parseFloat(c); if(!isNaN(v)&&v>0){ lens.push(v); break; } } // first positive number = length
+    });
+    if(lens.length){S.lengths=lens; scn.B=lens.slice(); scn.C=lens.slice();}
+  }
+  S.stringsPerRack=Math.max(1,Math.round(S.stringsPerRack||1));
+  save(); fillInputs(); renderAll();
+  return applied;
+}
+function readArrayBuffer(buf,srcLabel){
+  try{
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    const n=parseWorkbook(wb);
+    xlStatus(`Data source: <b>${srcLabel}</b> — ${n} parameters + ${S.lengths.length} feeders loaded.`,true);
+  }catch(e){ xlStatus(`Could not read ${srcLabel}: ${e.message}. Using current values.`,false); }
+}
+function fetchInputs(){
+  if(!hasXLSX())return;
+  fetch('inputs.xlsx',{cache:'no-store'}).then(r=>{ if(!r.ok) throw new Error('not found'); return r.arrayBuffer(); })
+    .then(buf=>readArrayBuffer(buf,'inputs.xlsx'))
+    .catch(()=>{ xlStatus('Data source: built-in defaults (no inputs.xlsx found next to the page). Import one, or commit inputs.xlsx to the repo.',false); });
+}
+function exportXlsx(){
+  if(!hasXLSX()){alert('Excel library did not load (needs internet).');return;}
+  const aoa=[['Parameter','Value','Unit','Key (do not edit)','Notes']];
+  XLDEF.forEach(d=>{
+    if(d[1]===null){ aoa.push([d[0],'','','','']); }
+    else{ aoa.push([d[0], S[d[1]], d[2]||'', d[1], d[3]||'']); }
+  });
+  const wsS=XLSX.utils.aoa_to_sheet(aoa); wsS['!cols']=[{wch:34},{wch:16},{wch:13},{wch:18},{wch:52}];
+  const faoa=[['HV Box','Feeder length (mm)','Notes']];
+  S.lengths.forEach((L,i)=>faoa.push(['HV Box '+(i+1),L,'']));
+  const wsF=XLSX.utils.aoa_to_sheet(faoa); wsF['!cols']=[{wch:16},{wch:20},{wch:40}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsS,'Settings');
+  XLSX.utils.book_append_sheet(wb,wsF,'Feeders');
+  XLSX.writeFile(wb,'inputs.xlsx');
+}
+function bindExcel(){
+  const imp=document.getElementById('xlImport');
+  if(imp) imp.addEventListener('change',e=>{
+    const file=e.target.files[0]; if(!file)return;
+    const rd=new FileReader();
+    rd.onload=ev=>readArrayBuffer(ev.target.result, file.name);
+    rd.readAsArrayBuffer(file); e.target.value='';
+  });
+  const exp=document.getElementById('xlExport'); if(exp) exp.onclick=exportXlsx;
+  const rel=document.getElementById('xlReload'); if(rel) rel.onclick=fetchInputs;
+}
+
+/* ============================= INIT ============================= */
+buildTabs();fillInputs();bindInputs();bindExcel();syncTabs();renderAll();
+fetchInputs(); // live: pull committed inputs.xlsx if present
+window.addEventListener('resize',()=>{if(['dash','viz'].includes(activeTab)){const m=compute();renderRoute(m);if(activeTab==='viz')renderIso(m);}});
+</script>
+</body>
+</html>
